@@ -4,7 +4,11 @@ const OpenAI = require('openai');
 require('dotenv').config(); // Load .env
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: 'https://focus-forge-clean.vercel.app', // your frontend URL here
+  methods: ['GET', 'POST'],
+  credentials: true,
+}));
 app.use(express.json());
 
 // 🔐 Create OpenAI client
@@ -54,5 +58,5 @@ app.post("/chat", async (req, res) => {
 });
 
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
