@@ -1,0 +1,23 @@
+body {
+  font-family: sans-serif;
+  background-color: #fff;
+  margin: 2rem;
+}
+
+input {
+  padding: 0.5rem;
+  width: 400px;
+  margin-right: 1rem;
+}
+
+button {
+  padding: 0.5rem 1rem;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #0056b3;
+}
