@@ -7,7 +7,7 @@ Built with **React**, **Express**, and **OpenAI API**.
 
 ## 🌐 Live Demo
 
-[![](https://img.shields.io/badge/Live%20Demo-🌐-blue?style=for-the-badge)](https://focus-forge-eight.vercel.app)
+[![](https://img.shields.io/badge/Live%20Demo-🌐-blue?style=for-the-badge)](https://focus-forge-clean.vercel.app/)
 
 
 ---
