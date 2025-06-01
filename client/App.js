@@ -1,22 +1,51 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
 
 function App() {
+
+  useEffect(() => {
+  const savedPlan = localStorage.getItem("focusforge_lastPlan");
+  const savedGoal = localStorage.getItem("focusforge_lastGoal");
+
+  if (savedPlan) {
+    setPlan(savedPlan);
+    setGoal(savedGoal || "");
+  }
+}, []);
+
   const [goal, setGoal] = useState("");
   const [plan, setPlan] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleGenerate = async () => {
-    setLoading(true);
-    const response = await fetch("http://localhost:3000/generate-study-plan", {
+const handleGenerate = async () => {
+  setLoading(true);
+  setPlan("");
+
+  try {
+    const response = await fetch("https://focus-forge-backend.onrender.com/generate-study-plan", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ goal }),
     });
 
+    if (!response.ok) {
+      throw new Error(`Server error: ${response.status}`);
+    }
+
     const data = await response.json();
     setPlan(data.plan);
-    setLoading(false);
-  };
+
+    // ✅ Save to localStorage
+    localStorage.setItem("focusforge_lastPlan", data.plan);
+    localStorage.setItem("focusforge_lastGoal", goal);
+  } catch (error) {
+    console.error("❌ Error fetching study plan:", error);
+    setPlan("⚠️ Failed to generate a plan. Please try again later.");
+  }
+
+  setLoading(false);
+};
+
 
   return (
     <div style={{ padding: "40px", fontFamily: "Arial, sans-serif", maxWidth: "600px", margin: "auto" }}>

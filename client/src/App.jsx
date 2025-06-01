@@ -1,99 +1,190 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import "./App.css";
+import {
+  auth,
+  provider,
+  signInWithPopup,
+  signOut,
+  db,
+  addDoc,
+  collection,
+  query,
+  where,
+  getDocs,
+  orderBy,
+} from "./firebase";
 
 function App() {
+  console.log("⚡ App loaded"); // ✅ Add this
+
   const [goal, setGoal] = useState("");
   const [plan, setPlan] = useState("");
   const [chatMessage, setChatMessage] = useState("");
   const [chatReply, setChatReply] = useState("");
+  const [user, setUser] = useState(null);
+  const [history, setHistory] = useState([]);
 
-  // Use environment variable for backend URL
   const apiUrl = import.meta.env.VITE_API_URL;
+
+  useEffect(() => {
+    const savedUser = localStorage.getItem("focusforge_user");
+    if (savedUser) setUser(JSON.parse(savedUser));
+    console.log("🔍 VITE_API_URL:", import.meta.env.VITE_API_URL);
+
+
+  }, []);
+
+  const login = async () => {
+    try {
+      const result = await signInWithPopup(auth, provider);
+      setUser(result.user);
+      localStorage.setItem("focusforge_user", JSON.stringify(result.user));
+    } catch (err) {
+      console.error("Login error:", err);
+    }
+  };
+
+  const logout = () => {
+    signOut(auth);
+    setUser(null);
+    localStorage.removeItem("focusforge_user");
+  };
 
   const handleSubmit = async () => {
     setPlan("⏳ Generating...");
     try {
       const res = await fetch(`${apiUrl}/generate-study-plan`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ goal }),
       });
 
       const data = await res.json();
       setPlan(data.plan || "⚠️ No plan received");
+
+      if (user) {
+        await addDoc(collection(db, "plans"), {
+          uid: user.uid,
+          goal,
+          plan: data.plan,
+          createdAt: new Date(),
+        });
+      }
     } catch (err) {
       console.error("Client Error:", err);
       setPlan("❌ Failed to generate a plan. Please check the backend.");
     }
   };
 
-  return (
-    <div style={{ padding: "2rem", fontFamily: "Arial" }}>
-      <h1>🎯 Study Plan Generator</h1>
-      <input
-        type="text"
-        value={goal}
-        onChange={(e) => setGoal(e.target.value)}
-        placeholder="Learn full-stack web dev in 3 months"
-        style={{ width: "400px", padding: "10px", fontSize: "1rem" }}
-      />
-      <button onClick={handleSubmit} style={{ marginLeft: "1rem", padding: "10px 20px" }}>
-        Generate Plan
-      </button>
-      <div
-        style={{
-          marginTop: "2rem",
-          background: "#f8f8f8",
-          padding: "20px",
-          borderRadius: "8px",
-          fontSize: "1rem",
-          lineHeight: "1.6",
-        }}
-        dangerouslySetInnerHTML={{
-          __html: plan
-            .replace(/\*\*/g, "")
-            .replace(/\n{2,}/g, "<br/><br/>")
-            .replace(/\n\s*[-–•]\s*(.*?)(?=\n|$)/g, "<div style='margin-left: 20px; margin-bottom: 8px;'>• $1</div>")
-            .replace(/\n/g, "<br/>")
-            .replace(/\n\s*\d+\.\s*(.*?):/g, "<div style='font-size: 1.3rem; font-weight: bold; margin: 1.5rem 0 0.5rem;'>$&</div>"),
-        }}
-      ></div>
+  const fetchHistory = async () => {
+    if (!user) return;
+    const q = query(
+      collection(db, "plans"),
+      where("uid", "==", user.uid),
+      orderBy("createdAt", "desc")
+    );
+    const snapshot = await getDocs(q);
+    const items = snapshot.docs.map((doc) => doc.data());
+    setHistory(items);
+  };
 
-      {plan && !plan.startsWith("⏳") && !plan.startsWith("❌") && (
+  console.log("👤 user state is:", user);
+
+  
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-8 font-sans">
+      <h1 className="text-3xl font-bold mb-4">🎯 Study Plan Generator</h1>
+
+      {user ? (
+        <div className="mb-4">
+          <p className="mb-2">Welcome, {user.displayName}</p>
+          <button
+            onClick={logout}
+            className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+          >
+            🚪 Log Out
+          </button>
+        </div>
+      ) : (
         <button
-          onClick={() => {
-            const element = document.createElement("a");
-            const file = new Blob([plan], { type: "text/plain" });
-            element.href = URL.createObjectURL(file);
-            element.download = "study-plan.txt";
-            document.body.appendChild(element);
-            element.click();
-          }}
-          style={{
-            marginTop: "1rem",
-            padding: "10px 20px",
-            fontSize: "1rem",
-            backgroundColor: "#007bff",
-            color: "#fff",
-            border: "none",
-            borderRadius: "4px",
-            cursor: "pointer",
-          }}
+          onClick={login}
+          className="mb-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
         >
-          ⬇️ Download as .txt
+          🔐 Sign in with Google
         </button>
       )}
 
-      <h2 style={{ marginTop: "2rem" }}>💬 Ask your GPT Tutor</h2>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+        <input
+          type="text"
+          value={goal}
+          onChange={(e) => setGoal(e.target.value)}
+          placeholder="Learn full-stack web dev in 3 months"
+          className="w-full sm:w-96 px-4 py-2 border rounded text-base"
+        />
+        <button
+          onClick={handleSubmit}
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+        >
+          Generate Plan
+        </button>
+      </div>
+
+      {plan && (
+        <div className="mt-6 bg-gray-100 p-4 rounded text-base leading-relaxed">
+          <h3 className="text-lg font-semibold mb-2">Your Personalized Plan:</h3>
+          <div
+            dangerouslySetInnerHTML={{
+              __html: plan
+                .replace(/\*\*/g, "")
+                .replace(/\n{2,}/g, "<br/><br/>")
+                .replace(/\n\s*[-–•]\s*(.*?)(?=\n|$)/g, "<div class='ml-4 mb-2'>• $1</div>")
+                .replace(/\n/g, "<br/>")
+                .replace(/\n\s*\d+\.\s*(.*?):/g, "<div class='text-lg font-bold mt-6 mb-2'>$&</div>")
+            }}
+          />
+          <button
+            onClick={() => {
+              localStorage.removeItem("focusforge_lastPlan");
+              localStorage.removeItem("focusforge_lastGoal");
+              setPlan("");
+              setGoal("");
+            }}
+            className="mt-4 px-3 py-2 text-sm bg-gray-300 hover:bg-gray-400 rounded"
+          >
+            🗑 Clear Saved Plan
+          </button>
+        </div>
+      )}
+
+      {user && (
+        <div className="mt-8">
+          <button
+            onClick={fetchHistory}
+            className="mb-4 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+          >
+            📜 Show My Plan History
+          </button>
+          <ul className="space-y-4">
+            {history.map((item, index) => (
+              <li key={index} className="bg-gray-200 p-4 rounded">
+                <strong>Goal:</strong> {item.goal}
+                <br />
+                <strong>Plan:</strong> <br /> {item.plan}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <h2 className="mt-10 text-xl font-semibold">💬 Ask your GPT Tutor</h2>
 
       <input
         type="text"
         value={chatMessage}
         onChange={(e) => setChatMessage(e.target.value)}
         placeholder="Ask a follow-up question..."
-        style={{ width: "100%", padding: "10px", fontSize: "1rem", marginTop: "10px" }}
+        className="w-full px-4 py-2 mt-2 border rounded text-base"
       />
 
       <button
@@ -112,25 +203,14 @@ function App() {
             setChatReply("❌ Chat request failed.");
           }
         }}
-        style={{ marginTop: "10px", padding: "10px 20px", cursor: "pointer" }}
+        className="mt-2 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
       >
         Ask GPT
       </button>
 
       {chatReply && (
-        <div
-          style={{
-            marginTop: "1.5rem",
-            padding: "1.2rem",
-            background: "#f9f9f9",
-            borderRadius: "10px",
-            fontSize: "16px",
-            lineHeight: "1.6",
-            whiteSpace: "pre-wrap",
-            border: "1px solid #ddd",
-          }}
-        >
-          <strong style={{ display: "block", marginBottom: "0.5rem" }}>GPT says:</strong>
+        <div className="mt-4 p-4 bg-gray-100 rounded text-base border border-gray-300">
+          <strong className="block mb-2">GPT says:</strong>
           {chatReply.replace(/\*\*/g, "")}
         </div>
       )}
@@ -139,3 +219,5 @@ function App() {
 }
 
 export default App;
+
+// 🔁 Vercel redeploy trigger
